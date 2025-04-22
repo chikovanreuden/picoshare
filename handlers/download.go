@@ -25,7 +25,7 @@ func (s Server) entryGet() http.HandlerFunc {
 			return
 		}
 
-		entry, err := s.getDB(r).GetEntry(id)
+		entry, err := s.getDB(r).GetEntryMetadata(id)
 		if _, ok := err.(store.EntryNotFoundError); ok {
 			http.Error(w, "entry not found", http.StatusNotFound)
 			return
@@ -45,11 +45,18 @@ func (s Server) entryGet() http.HandlerFunc {
 				contentType = inferred
 			}
 		}
-		w.Header().Set("Content-Type", string(contentType))
+		w.Header().Set("Content-Type", contentType.String())
 
-		http.ServeContent(w, r, string(entry.Filename), entry.Uploaded, entry.Reader)
+		entryFile, err := s.getDB(r).ReadEntryFile(id)
+		if err != nil {
+			log.Printf("error retrieving entry data with id %v: %v", id, err)
+			http.Error(w, "failed to retrieve entry", http.StatusInternalServerError)
+			return
+		}
 
-		if err := recordDownload(s.getDB(r), entry.ID, r.RemoteAddr, r.Header.Get("User-Agent")); err != nil {
+		http.ServeContent(w, r, entry.Filename.String(), entry.Uploaded, entryFile)
+
+		if err := recordDownload(s.getDB(r), entry.ID, s.clock.Now(), r.RemoteAddr, r.Header.Get("User-Agent")); err != nil {
 			log.Printf("failed to record download of file %s: %v", id.String(), err)
 		}
 	}
@@ -64,14 +71,14 @@ func inferContentTypeFromFilename(f picoshare.Filename) (picoshare.ContentType, 
 	return picoshare.ContentType(""), errors.New("could not infer content type from filename")
 }
 
-func recordDownload(db Store, id picoshare.EntryID, remoteAddr, userAgent string) error {
+func recordDownload(db Store, id picoshare.EntryID, t time.Time, remoteAddr, userAgent string) error {
 	ip, _, err := net.SplitHostPort(remoteAddr)
 	if err != nil {
 		ip = remoteAddr
 	}
 
 	return db.InsertEntryDownload(id, picoshare.DownloadRecord{
-		Time:      time.Now(),
+		Time:      t,
 		ClientIP:  ip,
 		UserAgent: userAgent,
 	})

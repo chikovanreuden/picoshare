@@ -13,13 +13,13 @@ import (
 const (
 	timeFormat = time.RFC3339
 	// I think Chrome reads in 32768 chunks, but I haven't checked rigorously.
-	defaultChunkSize = 32768 * 10
+	defaultChunkSize = uint64(32768 * 10)
 )
 
 type (
 	Store struct {
 		ctx       *sql.DB
-		chunkSize int
+		chunkSize uint64
 	}
 
 	rowScanner interface {
@@ -33,7 +33,7 @@ func New(path string, optimizeForLitestream bool) Store {
 
 // NewWithChunkSize creates a SQLite-based datastore with the user-specified
 // chunk size for writing files. Most callers should just use New().
-func NewWithChunkSize(path string, chunkSize int, optimizeForLitestream bool) Store {
+func NewWithChunkSize(path string, chunkSize uint64, optimizeForLitestream bool) Store {
 	log.Printf("reading DB from %s", path)
 	ctx, err := sql.Open("sqlite3", path)
 	if err != nil {
@@ -74,6 +74,18 @@ func formatTime(t time.Time) string {
 	return t.UTC().Format(timeFormat)
 }
 
+func formatFileLifetime(lt picoshare.FileLifetime) string {
+	return lt.String()
+}
+
 func parseDatetime(s string) (time.Time, error) {
 	return time.Parse(timeFormat, s)
+}
+
+func parseFileLifetime(s string) (picoshare.FileLifetime, error) {
+	d, err := time.ParseDuration(s)
+	if err != nil {
+		return picoshare.FileLifetime{}, err
+	}
+	return picoshare.NewFileLifetimeFromDuration(d)
 }

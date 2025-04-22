@@ -16,14 +16,15 @@ type (
 	}
 
 	UploadMetadata struct {
-		ID          EntryID
-		Filename    Filename
-		Note        FileNote
-		ContentType ContentType
-		Uploaded    time.Time
-		Expires     ExpirationTime
-		Size        uint64
-		GuestLink   GuestLink
+		ID            EntryID
+		Filename      Filename
+		Note          FileNote
+		ContentType   ContentType
+		Uploaded      time.Time
+		Expires       ExpirationTime
+		Size          FileSize
+		GuestLink     GuestLink
+		DownloadCount uint64
 	}
 
 	DownloadRecord struct {
@@ -49,8 +50,16 @@ func (f Filename) String() string {
 	return string(f)
 }
 
+func (ct ContentType) String() string {
+	return string(ct)
+}
+
 func (et ExpirationTime) String() string {
-	return (time.Time(et)).String()
+	return et.Time().String()
+}
+
+func (et ExpirationTime) Time() time.Time {
+	return time.Time(et)
 }
 
 func (n FileNote) String() string {
